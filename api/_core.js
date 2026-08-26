@@ -1,5 +1,5 @@
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
-const FALLBACK_MODELS = [...new Set([PRIMARY_MODEL, 'gemini-2.5-flash-lite'])];
+const PRIMARY_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash'];
 
 function parseGeminiText(data) {
   const parts = data?.candidates?.[0]?.content?.parts || [];
@@ -7,7 +7,7 @@ function parseGeminiText(data) {
 }
 
 async function askModel(model, key, instructions, input, options = {}) {
-  const timeoutMs = options.timeoutMs || 18000;
+  const timeoutMs = options.timeoutMs || 22000;
   const maxOutputTokens = options.maxOutputTokens || 900;
   const json = !!options.json;
   const controller = new AbortController();
@@ -37,7 +37,7 @@ async function askGemini(instructions, input, options = {}) {
   for (const model of FALLBACK_MODELS) {
     try { return await askModel(model, key, instructions, input, options); }
     catch (e) {
-      const seconds = Math.round((options.timeoutMs || 18000) / 1000);
+      const seconds = Math.round((options.timeoutMs || 22000) / 1000);
       const msg = e?.name === 'AbortError' ? `${model}: timeout ${seconds} s` : `${model}: ${e.message}`;
       errors.push(msg); console.warn('Gemini fallback:', msg);
     }
@@ -79,7 +79,8 @@ const PROMPTS = {
 
 export async function runAgent(role, goal, current, history, rules, round) {
   const input = `OBJETIVO:\n${goal}\n\nREGLAS DEL USUARIO:\n${rules || 'Ninguna'}\n\nRONDA/ITERACIÓN: ${round}\n\nESTADO ACTUAL:\n${current || 'Todavía no existe'}\n\nHISTORIAL RECIENTE:\n${(history || []).slice(-6).map(x=>`${x.role}: ${x.text}`).join('\n\n') || 'Vacío'}`;
-  return (await askGemini(PROMPTS[role] || PROMPTS.Creador, input, {maxOutputTokens: role === 'Reviewer' || role === 'Evaluador' ? 650 : 1100, timeoutMs:18000, json:role === 'Reviewer' || role === 'Evaluador'})) ?? demoAgent(role, goal, current, rules, round);
+  const timeoutMs = role === 'Reviewer' || role === 'Evaluador' ? 26000 : 22000;
+  return (await askGemini(PROMPTS[role] || PROMPTS.Creador, input, {maxOutputTokens: role === 'Reviewer' || role === 'Evaluador' ? 650 : 1100, timeoutMs, json:role === 'Reviewer' || role === 'Evaluador'})) ?? demoAgent(role, goal, current, rules, round);
 }
 
 function extractJson(text) {
@@ -101,7 +102,7 @@ function auditProject(project) {
 export async function buildProject(goal, rules, plan, history) {
   const instructions = `Sos BUILDER, programador senior. ENTREGÁ CÓDIGO REAL de un MVP pequeño y ejecutable, no una explicación.\n\n${HARD_GATE}\n\nGenerá como máximo 10 archivos. No uses claves hardcodeadas. Si hay una API externa, implementá la llamada real con variables de entorno/secrets, timeout y errores. Incluí requirements/package manifest, .gitignore y README cuando correspondan.\n\nRespondé SOLO JSON con esta forma exacta:\n{"name":"nombre-corto","summary":"qué hace el MVP","stack":"stack breve","run":"cómo ejecutarlo","files":[{"path":"ruta/archivo.ext","content":"contenido completo"}],"notes":["nota"]}\n\nCada content debe ser el archivo COMPLETO. Sin markdown fences, sin 'resto igual', sin pseudocódigo.`;
   const input = `OBJETIVO:\n${goal}\n\nREGLAS:\n${rules || 'Ninguna'}\n\nPLAN INTEGRADO:\n${plan}\n\nDECISIONES Y REVISIONES:\n${(history || []).slice(-10).map(x=>`${x.role}: ${x.text}`).join('\n\n')}`;
-  const raw = (await askGemini(instructions, input, {maxOutputTokens:9000,timeoutMs:50000,json:true})) || JSON.stringify({name:'demo-mvp',summary:'Proyecto demo',stack:'HTML/CSS/JS',run:'Abrir index.html',files:[{path:'index.html',content:`<!doctype html><html><body><h1>${goal}</h1></body></html>`}],notes:['Modo demo']});
+  const raw = (await askGemini(instructions, input, {maxOutputTokens:9000,timeoutMs:60000,json:true})) || JSON.stringify({name:'demo-mvp',summary:'Proyecto demo',stack:'HTML/CSS/JS',run:'Abrir index.html',files:[{path:'index.html',content:`<!doctype html><html><body><h1>${goal}</h1></body></html>`}],notes:['Modo demo']});
   const project = extractJson(raw);
   if (!Array.isArray(project.files) || !project.files.length) throw new Error('El Builder no generó archivos.');
   project.files = project.files.slice(0,10).map(f=>({path:String(f.path || 'archivo.txt').replace(/^\/+/,''),content:String(f.content || '')}));
