@@ -16,3 +16,5 @@ GEMINI_MODEL=gemini-3.7-flash
 ## Deploy
 
 El proyecto está preparado para Vercel con funciones serverless en `/api`.
+
+Último ajuste: timeout corto de Gemini y mejor manejo de errores para evitar bloqueos en la deliberación.
