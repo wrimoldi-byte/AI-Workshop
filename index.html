@@ -3,32 +3,32 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Workshop</title>
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <div class="shell">
   <header>
-    <div><span class="eyebrow">LABORATORIO MULTI-AGENTE</span><h1>AI Workshop</h1><p id="subtitle">Las IAs proponen, critican y mejoran una idea hasta llegar a una solución fuerte.</p></div>
+    <div><span class="eyebrow">LABORATORIO MULTI-AGENTE</span><h1>AI Workshop</h1><p id="subtitle">Los agentes definen, programan, auditan y generan archivos reales del proyecto.</p></div>
     <div id="mode" class="pill">conectando…</div>
   </header>
 
   <div class="modebar" role="tablist">
-    <button class="modebtn active" data-workmode="ideas">💡 Modo Ideas</button>
-    <button class="modebtn" data-workmode="dev">🛠️ Modo Desarrollo</button>
+    <button class="modebtn" data-workmode="ideas">💡 Solo Ideas</button>
+    <button class="modebtn active" data-workmode="dev">🛠️ Desarrollo · predeterminado</button>
   </div>
 
   <section class="panel hero">
-    <label id="goalLabel">¿Qué querés crear o resolver?</label>
-    <div class="goalrow"><textarea id="goal" placeholder="Ej: Inventá una app útil para vendedores de Mercado Libre"></textarea><button id="mic" class="iconbtn" title="Hablar">🎙️</button></div>
+    <label id="goalLabel">¿Qué querés que desarrolle?</label>
+    <div class="goalrow"><textarea id="goal" placeholder="Ej: Desarrollá un juego Android/PWA completo y entregame los archivos reales"></textarea><button id="mic" class="iconbtn" title="Hablar">🎙️</button></div>
     <label>Reglas permanentes del proyecto</label>
-    <textarea id="rules" class="small" placeholder="Ej: Tiene que ser simple, barato y usable desde el celular."></textarea>
+    <textarea id="rules" class="small" placeholder="Ej: Sin simulaciones, sin TODOs y debe terminar con archivos descargables."></textarea>
     <div class="controls">
-      <div><label id="roundsLabel">Máx. rondas</label><input id="rounds" type="number" min="1" max="10" value="5"></div>
+      <div><label id="roundsLabel">Iteraciones QA</label><input id="rounds" type="number" min="1" max="3" value="2"></div>
       <div><label>Objetivo</label><input id="target" type="number" min="1" max="10" step="0.1" value="9"></div>
-      <button id="run" class="primary">▶ Iniciar deliberación</button>
+      <button id="run" class="primary">🛠️ Desarrollar MVP</button>
       <button id="stop" class="secondary" disabled>■ Detener</button>
     </div>
-    <div id="devHint" class="hint hidden">En Desarrollo, los agentes cierran requisitos, diseñan arquitectura, revisan riesgos y un Builder genera archivos reales del MVP. Los mocks, TODOs y APIs simuladas bloquean la aprobación.</div>
+    <div id="devHint" class="hint">Desarrollo es el modo predeterminado. Debe terminar en 📦 Proyecto generado. Si una IA devuelve código en texto, Delivery Guard lo convierte automáticamente en archivos descargables.</div>
   </section>
 
   <section id="memoryPanel" class="panel memory">
@@ -45,7 +45,7 @@
     <div class="panel conversation"><div class="sectiontitle"><h2>Conversación entre agentes</h2><button id="clear" class="linkbtn">Limpiar</button></div><div id="log" class="log"><div class="empty">La deliberación aparecerá acá en tiempo real.</div></div></div>
   </section>
 
-  <section class="panel result"><div class="sectiontitle"><h2 id="resultTitle">Mejor resultado</h2><button id="copy" class="secondary">Copiar</button></div><div id="result">Todavía no hay una propuesta.</div></section>
+  <section class="panel result"><div class="sectiontitle"><h2 id="resultTitle">Resultado</h2><button id="copy" class="secondary">Copiar</button></div><div id="result">Todavía no hay una propuesta.</div></section>
 
   <section id="projectPanel" class="panel project hidden">
     <div class="sectiontitle"><div><h2>📦 Proyecto generado</h2><small id="projectMeta"></small></div><div class="projectActions"><button id="downloadZip" class="primary">Descargar ZIP</button><button id="downloadManifest" class="secondary">proyecto.json</button><button id="downloadFile" class="secondary">Archivo actual</button></div></div>
@@ -56,15 +56,16 @@
     <div class="githubbox">
       <div class="githubhead"><div><h3>🐙 GitHub + Ejecutable</h3><p>Publica los archivos reales y, para Python/Streamlit, genera un .EXE con GitHub Actions.</p></div><span id="githubStatus" class="ghstatus">comprobando…</span></div>
       <div id="githubSetup" class="ghsetup hidden">Falta configurar <b>GITHUB_TOKEN</b> como Secret de Vercel. No pegues tokens dentro del proyecto ni en este formulario.</div>
-      <div class="ghfields"><div><label>Repositorio</label><input id="githubRepo" placeholder="wrimoldi-byte/PicPerfect-ML"></div><div><label>Rama</label><input id="githubBranch" value="main"></div></div>
+      <div class="ghfields"><div><label>Repositorio</label><input id="githubRepo" placeholder="wrimoldi-byte/Mi-Proyecto"></div><div><label>Rama</label><input id="githubBranch" value="main"></div></div>
       <div class="ghactions"><button id="publishGithub" class="primary">↑ Publicar en GitHub</button><button id="buildExe" class="secondary" disabled>⚙ Compilar .EXE</button><button id="checkBuild" class="secondary">↻ Revisar build</button><a id="githubLink" class="actionlink hidden" target="_blank" rel="noopener">Abrir GitHub</a></div>
       <div id="githubMessage" class="ghmessage">Primero generá un proyecto y elegí el repositorio de destino.</div>
     </div>
   </section>
 </div>
-<script src="app.js?v=6"></script>
-<script src="zip.js?v=6"></script>
-<script src="autodev.js?v=6"></script>
-<script src="memory.js?v=6"></script>
-<script src="memory-migrate.js?v=6"></script>
+<script src="app.js?v=7"></script>
+<script src="zip.js?v=7"></script>
+<script src="autodev.js?v=7"></script>
+<script src="memory.js?v=7"></script>
+<script src="memory-migrate.js?v=7"></script>
+<script src="delivery-guard.js?v=7"></script>
 </body></html>
