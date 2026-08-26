@@ -9,22 +9,22 @@ function parseGeminiText(data) {
 async function askModel(model, key, instructions, input, options = {}) {
   const timeoutMs = options.timeoutMs || 22000;
   const maxOutputTokens = options.maxOutputTokens || 900;
-  const json = !!options.json;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-
   try {
     const generationConfig = {maxOutputTokens};
-    if (json) generationConfig.responseMimeType = 'application/json';
-    const r = await fetch(url, {
+    if (options.json) generationConfig.responseMimeType = 'application/json';
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST', signal: controller.signal,
       headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
-      body: JSON.stringify({systemInstruction:{parts:[{text:instructions}]}, contents:[{role:'user',parts:[{text:input}]}], generationConfig})
+      body: JSON.stringify({
+        systemInstruction:{parts:[{text:instructions}]},
+        contents:[{role:'user',parts:[{text:input}]}],
+        generationConfig
+      })
     });
     if (!r.ok) throw new Error(`Gemini ${model} ${r.status}: ${await r.text()}`);
-    const data = await r.json();
-    const text = parseGeminiText(data);
+    const text = parseGeminiText(await r.json());
     if (!text) throw new Error(`Gemini ${model} respondió sin texto utilizable.`);
     return text;
   } finally { clearTimeout(timer); }
@@ -39,48 +39,38 @@ async function askGemini(instructions, input, options = {}) {
     catch (e) {
       const seconds = Math.round((options.timeoutMs || 22000) / 1000);
       const msg = e?.name === 'AbortError' ? `${model}: timeout ${seconds} s` : `${model}: ${e.message}`;
-      errors.push(msg); console.warn('Gemini fallback:', msg);
+      errors.push(msg);
+      console.warn('Gemini fallback:', msg);
     }
   }
   throw new Error(`Gemini no respondió. ${errors.join(' | ')}`);
 }
 
-function demoAgent(role, goal, current, rules, round) {
-  const base = current || `Propuesta inicial para: ${goal}`;
-  if (role === 'Creador') return `${base}\n\nRonda ${round}: estructuro una solución más concreta, priorizando objetivo, usuario, flujo principal y criterios de éxito.`;
-  if (role === 'Crítico') return `Crítica ronda ${round}: faltan criterios medibles, riesgos, límites y validación con usuario. Reglas activas: ${rules || 'ninguna'}.`;
-  if (role === 'Especialista') return `Mejora técnica ronda ${round}: dividir en módulos, registrar decisiones, evitar bucles y conservar el mejor resultado anterior.`;
-  if (role === 'Evaluador') return JSON.stringify({score:8.5,verdict:'ITERAR',reason:'Falta validar la implementación real.'});
-  if (role === 'Director') return `MVP definido para ${goal}: alcance pequeño, usuario claro, flujo principal y criterio de terminado.`;
-  if (role === 'Arquitecto') return 'Arquitectura mínima, ejecutable, con integraciones reales y secretos fuera del código.';
-  if (role === 'Frontend') return 'Frontend responsive con estados de carga, éxito, error y validación.';
-  if (role === 'Backend') return 'Backend mínimo con integración real, timeout, validación y manejo de errores.';
-  if (role === 'Tester') return 'QA: rechazar mocks, TODOs, placeholders, APIs simuladas e integraciones no verificables.';
-  if (role === 'Integrador') return 'Especificación integrada sin simulaciones ni piezas pendientes.';
-  if (role === 'Reviewer') return JSON.stringify({score:8.4,verdict:'ITERAR',reason:'No aprobar hasta eliminar toda simulación y completar integraciones.',fixes:['Eliminar mocks y placeholders','Asegurar integración real']});
-  return base;
-}
-
-const HARD_GATE = `REGLA DE TERMINADO OBLIGATORIA: un MVP NO está terminado si contiene TODO, FIXME, mock, simulación, placeholder, datos falsos, una API comentada en vez de implementada, funciones vacías, secretos hardcodeados o instrucciones del tipo "reemplazar luego". Una integración externa debe estar implementada realmente usando variables de entorno/secrets y manejo de error/timeout. Tampoco está terminado si le faltan manifiestos, dependencias o configuración necesaria para instalar, ejecutar o compilar. Si aparece cualquiera de estas señales, la nota máxima es 7.0 y el veredicto debe ser ITERAR.`;
+const HARD_GATE = `REGLA DE TERMINADO OBLIGATORIA: un MVP NO está terminado si contiene TODO, FIXME, mock, simulación, placeholder, datos falsos, funciones vacías, secretos hardcodeados, archivos truncados o instrucciones del tipo "reemplazar luego". Tampoco está terminado si faltan manifiestos, escenas, dependencias o configuración necesaria para ejecutar o compilar. Si aparece cualquiera de estas señales, la nota máxima es 7.0 y el veredicto debe ser ITERAR.`;
 
 const PROMPTS = {
   Creador: 'Sos el agente CREADOR. Proponé o reescribí la mejor solución posible. Integrá críticas y reglas. Sé concreto y accionable. No hagas preguntas al usuario.',
   Crítico: 'Sos el agente CRÍTICO. Buscá errores, contradicciones, supuestos débiles, riesgos y oportunidades de mejora. Sé exigente y breve.',
   Especialista: 'Sos el agente ESPECIALISTA/ARQUITECTO. Convertí la crítica en mejoras concretas de diseño, implementación, UX y robustez.',
   Evaluador: `Sos EVALUADOR. ${HARD_GATE} Respondé SOLO JSON válido con {"score":numero_0_a_10,"verdict":"APROBAR"|"ITERAR","reason":"texto breve"}. Aprobar solo si score >= 9.`,
-  Director: `Sos DIRECTOR DE PRODUCTO. Cerrá decisiones sin preguntarle al usuario. Convertí la idea en un MVP desarrollable con criterios de aceptación verificables. ${HARD_GATE}`,
-  Arquitecto: `Sos ARQUITECTO DE SOFTWARE. Diseñá la solución técnica mínima que pueda ejecutarse de verdad. Elegí stack, archivos, contratos, secretos y manejo de errores. Para Expo/React Native exigí package.json y configuración de compilación Android si el objetivo pide APK. ${HARD_GATE}`,
-  Frontend: `Sos DESARROLLADOR FRONTEND. Definí una interfaz concreta, responsive y completa, con carga/error/éxito y validaciones. ${HARD_GATE}`,
-  Backend: `Sos DESARROLLADOR BACKEND. Implementación real: endpoints/integraciones, validación, seguridad, secrets, timeouts y errores. No aceptes APIs simuladas. ${HARD_GATE}`,
-  Tester: `Sos QA/TESTER. Intentá romper la solución. Buscá explícitamente TODO, FIXME, mock, simulación, placeholder, integraciones comentadas o ficticias, dependencias faltantes, manifiestos ausentes, configuración de build faltante, secretos inseguros y caminos no implementados. En Expo/React Native, App.js + app.config + README sin package.json es un FALLO. ${HARD_GATE}`,
-  Integrador: `Sos PROGRAMADOR INTEGRADOR. Cerrá una especificación implementable y resolvé contradicciones. Indicá exactamente archivos y comportamiento. No dejes decisiones pendientes. ${HARD_GATE}`,
-  Reviewer: `Sos REVIEWER TÉCNICO y tenés poder de veto. ${HARD_GATE} Revisá el estado integrado y respondé SOLO JSON válido con {"score":numero_0_a_10,"verdict":"APROBAR"|"ITERAR","reason":"texto breve","fixes":["cambio 1","cambio 2"]}. Aprobar únicamente si puede convertirse ya en un MVP funcional, instalar dependencias y compilarse sin piezas faltantes.`
+  Director: `Sos DIRECTOR DE PRODUCTO. Cerrá decisiones sin preguntarle al usuario. Convertí la idea en un MVP desarrollable con criterios verificables. ${HARD_GATE}`,
+  Arquitecto: `Sos ARQUITECTO DE SOFTWARE. Diseñá la solución técnica mínima ejecutable. Si el proyecto ya eligió Godot, mantené Godot y no lo migres a React/Node/Expo. ${HARD_GATE}`,
+  Frontend: `Sos DESARROLLADOR FRONTEND. Definí interfaz y experiencia completas para el stack elegido. ${HARD_GATE}`,
+  Backend: `Sos DESARROLLADOR BACKEND. Implementá lógica e integraciones reales, validación, seguridad, timeouts y errores. ${HARD_GATE}`,
+  Tester: `Sos QA/TESTER. Buscá explícitamente archivos truncados, TODO, mocks, escenas faltantes, manifiestos ausentes, dependencias faltantes y caminos no implementados. En Godot verificá project.godot, escenas .tscn y scripts .gd completos. ${HARD_GATE}`,
+  Integrador: `Sos PROGRAMADOR INTEGRADOR. Cerrá una especificación implementable, resolvé contradicciones y no cambies de stack sin una razón indispensable. ${HARD_GATE}`,
+  Reviewer: `Sos REVIEWER TÉCNICO y tenés poder de veto. ${HARD_GATE} Respondé SOLO JSON válido con {"score":numero_0_a_10,"verdict":"APROBAR"|"ITERAR","reason":"texto breve","fixes":["cambio 1","cambio 2"]}. Aprobar únicamente si puede convertirse ya en un MVP funcional.`
 };
+
+function demoAgent(role, goal) {
+  if (role === 'Reviewer' || role === 'Evaluador') return JSON.stringify({score:8.2,verdict:'ITERAR',reason:'Modo demo: falta validar implementación real.',fixes:['Completar implementación']});
+  return `${role}: propuesta concreta para ${goal}`;
+}
 
 export async function runAgent(role, goal, current, history, rules, round) {
   const input = `OBJETIVO:\n${goal}\n\nREGLAS DEL USUARIO:\n${rules || 'Ninguna'}\n\nRONDA/ITERACIÓN: ${round}\n\nESTADO ACTUAL:\n${current || 'Todavía no existe'}\n\nHISTORIAL RECIENTE:\n${(history || []).slice(-6).map(x=>`${x.role}: ${x.text}`).join('\n\n') || 'Vacío'}`;
-  const timeoutMs = role === 'Reviewer' || role === 'Evaluador' ? 26000 : 22000;
-  return (await askGemini(PROMPTS[role] || PROMPTS.Creador, input, {maxOutputTokens: role === 'Reviewer' || role === 'Evaluador' ? 650 : 1100, timeoutMs, json:role === 'Reviewer' || role === 'Evaluador'})) ?? demoAgent(role, goal, current, rules, round);
+  const judge = role === 'Reviewer' || role === 'Evaluador';
+  return (await askGemini(PROMPTS[role] || PROMPTS.Creador, input, {maxOutputTokens:judge?700:1200,timeoutMs:judge?28000:24000,json:judge})) ?? demoAgent(role, goal);
 }
 
 function extractJson(text) {
@@ -90,50 +80,74 @@ function extractJson(text) {
   throw new Error('El Builder no devolvió JSON válido.');
 }
 
+function balance(text, open, close) {
+  return [...text].reduce((n,c)=>n+(c===open?1:c===close?-1:0),0);
+}
+
 function auditProject(project, goal = '') {
-  const forbidden = /\b(TODO|FIXME|mock|simulaci[oó]n|placeholder|reemplazar\s+(con|luego)|implementar\s+luego|fake\s+data)\b/i;
   const findings = [];
-  const files = project.files || [];
+  const files = Array.isArray(project.files) ? project.files : [];
   const paths = files.map(f=>String(f.path||'').toLowerCase());
   const joined = files.map(f=>String(f.content||'')).join('\n');
   const stackGoal = `${project.stack||''} ${goal||''} ${joined.slice(0,30000)}`;
+  const forbidden = /\b(TODO|FIXME|mock|simulaci[oó]n|placeholder|reemplazar\s+(con|luego)|implementar\s+luego|fake\s+data)\b/i;
 
   for (const f of files) {
-    if (forbidden.test(f.content || '')) findings.push(`${f.path}: contiene señal de implementación incompleta`);
+    const content = String(f.content||'');
+    if (forbidden.test(content)) findings.push(`${f.path}: contiene señal de implementación incompleta`);
   }
 
-  const isNodeLike = paths.some(p=>/\.(js|jsx|ts|tsx)$/.test(p)) || /React|Next\.js|Node|Expo|React Native/i.test(stackGoal);
+  const isGodot = paths.includes('project.godot') || paths.some(p=>p.endsWith('.gd') || p.endsWith('.tscn')) || /\bGodot\b/i.test(`${project.stack||''} ${goal||''}`);
+
+  if (isGodot) {
+    if (!paths.includes('project.godot')) findings.push('Godot: falta project.godot.');
+    if (!paths.some(p=>p.endsWith('.tscn'))) findings.push('Godot: falta al menos una escena .tscn ejecutable.');
+    for (const f of files.filter(f=>String(f.path||'').toLowerCase().endsWith('.gd'))) {
+      const c = String(f.content||'').trim();
+      if (!c) findings.push(`${f.path}: script vacío.`);
+      if (/[=,+\-*\/.\[(]$/.test(c)) findings.push(`${f.path}: parece truncado al final.`);
+      if (balance(c,'(',')') > 0 || balance(c,'[',']') > 0 || balance(c,'{','}') > 0) findings.push(`${f.path}: parece truncado o tiene delimitadores sin cerrar.`);
+    }
+  }
+
+  const isNodeLike = !isGodot && (paths.some(p=>/\.(js|jsx|ts|tsx)$/.test(p)) || /React|Next\.js|Node\.js|npm|Expo|React Native/i.test(stackGoal));
   if (isNodeLike && !paths.includes('package.json')) findings.push('Falta package.json: el proyecto JavaScript/TypeScript no puede instalar dependencias.');
 
-  const isExpo = paths.some(p=>['app.config.js','app.config.ts','app.json'].includes(p)) || /\bExpo\b|React Native/i.test(stackGoal);
+  const isExpo = !isGodot && (paths.some(p=>['app.config.js','app.config.ts','app.json'].includes(p)) || /\bExpo\b|React Native/i.test(stackGoal));
   if (isExpo) {
     const hasEntry = paths.some(p=>['app.js','app.jsx','app.ts','app.tsx','index.js','index.ts','index.tsx'].includes(p) || p.startsWith('src/'));
     const hasConfig = paths.some(p=>['app.config.js','app.config.ts','app.json'].includes(p));
     const hasAndroidBuild = paths.includes('eas.json') || paths.some(p=>p==='android/build.gradle' || p==='android/app/build.gradle');
-    if (!hasEntry) findings.push('Expo/React Native: falta el archivo de entrada de la aplicación.');
-    if (!hasConfig) findings.push('Expo/React Native: falta app.json o app.config.js/app.config.ts.');
-    if (/android|apk/i.test(goal) && !hasAndroidBuild) findings.push('Expo/React Native para Android/APK: falta eas.json o configuración Gradle compilable.');
+    if (!hasEntry) findings.push('Expo/React Native: falta el archivo de entrada.');
+    if (!hasConfig) findings.push('Expo/React Native: falta app.json o app.config.*.');
+    if (/android|apk/i.test(goal) && !hasAndroidBuild) findings.push('Expo/React Native para APK: falta eas.json o Gradle.');
   }
 
-  const isPython = paths.some(p=>p.endsWith('.py')) || /Python|Streamlit|FastAPI/i.test(stackGoal);
+  const isPython = !isGodot && (paths.some(p=>p.endsWith('.py')) || /Python|Streamlit|FastAPI/i.test(stackGoal));
   if (isPython && !paths.includes('requirements.txt') && !paths.includes('pyproject.toml')) findings.push('Proyecto Python: falta requirements.txt o pyproject.toml.');
 
   return findings;
 }
 
 export async function buildProject(goal, rules, plan, history) {
-  const instructions = `Sos BUILDER, programador senior. ENTREGÁ CÓDIGO REAL de un MVP pequeño y ejecutable, no una explicación.\n\n${HARD_GATE}\n\nGenerá como máximo 10 archivos. No uses claves hardcodeadas. Si hay una API externa, implementá la llamada real con variables de entorno/secrets, timeout y errores. Incluí requirements/package manifest, .gitignore y README cuando correspondan.\n\nREGLA ANDROID/EXPO: si el proyecto usa React Native o Expo, incluí obligatoriamente package.json con dependencias reales, App.js/App.tsx o entry equivalente, app.json o app.config.js y, si el objetivo pide APK/Android, eas.json o configuración Gradle capaz de compilar. NO entregues únicamente App.js + app.config + README.\n\nRespondé SOLO JSON con esta forma exacta:\n{"name":"nombre-corto","summary":"qué hace el MVP","stack":"stack breve","run":"cómo ejecutarlo","files":[{"path":"ruta/archivo.ext","content":"contenido completo"}],"notes":["nota"]}\n\nCada content debe ser el archivo COMPLETO. Sin markdown fences, sin 'resto igual', sin pseudocódigo.`;
+  const isGodotGoal = /\bGodot\b|\.gd\b|\.tscn\b|project\.godot/i.test(`${goal}\n${plan}`);
+  const stackRule = isGodotGoal
+    ? `REGLA GODOT: mantené Godot 4.x. NO generes package.json, React, Node.js ni Expo. Entregá project.godot, escenas .tscn y scripts .gd completos. Si el plan es demasiado grande, REDUCÍ funcionalidades: priorizá archivos completos antes que cantidad. Máximo 8 archivos.`
+    : `Si usa React Native/Expo, incluí package.json, entry, app config y configuración Android cuando corresponda.`;
+
+  const instructions = `Sos BUILDER, programador senior. ENTREGÁ CÓDIGO REAL de un MVP pequeño y ejecutable, no una explicación.\n\n${HARD_GATE}\n\n${stackRule}\n\nNunca cortes un archivo. Si no entra todo, simplificá el MVP. No uses claves hardcodeadas. Cada archivo debe estar completo y coherente con los demás.\n\nRespondé SOLO JSON con esta forma exacta:\n{"name":"nombre-corto","summary":"qué hace el MVP","stack":"stack breve","run":"cómo ejecutarlo","files":[{"path":"ruta/archivo.ext","content":"contenido completo"}],"notes":["nota"]}\n\nSin markdown fences, sin pseudocódigo, sin 'resto igual'.`;
+
   const input = `OBJETIVO:\n${goal}\n\nREGLAS:\n${rules || 'Ninguna'}\n\nPLAN INTEGRADO:\n${plan}\n\nDECISIONES Y REVISIONES:\n${(history || []).slice(-10).map(x=>`${x.role}: ${x.text}`).join('\n\n')}`;
-  const raw = (await askGemini(instructions, input, {maxOutputTokens:9000,timeoutMs:60000,json:true})) || JSON.stringify({name:'demo-mvp',summary:'Proyecto demo',stack:'HTML/CSS/JS',run:'Abrir index.html',files:[{path:'index.html',content:`<!doctype html><html><body><h1>${goal}</h1></body></html>`}],notes:['Modo demo']});
+  const raw = (await askGemini(instructions, input, {maxOutputTokens:14000,timeoutMs:75000,json:true})) || JSON.stringify({name:'demo-mvp',summary:'Proyecto demo',stack:'HTML/CSS/JS',run:'Abrir index.html',files:[{path:'index.html',content:`<!doctype html><html><body><h1>${goal}</h1></body></html>`}],notes:['Modo demo']});
   const project = extractJson(raw);
   if (!Array.isArray(project.files) || !project.files.length) throw new Error('El Builder no generó archivos.');
-  project.files = project.files.slice(0,10).map(f=>({path:String(f.path || 'archivo.txt').replace(/^\/+/,''),content:String(f.content || '')}));
+  project.files = project.files.slice(0,isGodotGoal?8:10).map(f=>({path:String(f.path || 'archivo.txt').replace(/^\/+/,''),content:String(f.content || '')}));
   const findings = auditProject(project, goal);
-  project.audit = {passed: findings.length === 0, findings};
+  project.audit = {passed:findings.length===0,findings};
   if (findings.length) throw new Error(`Builder rechazado por control de calidad: ${findings.join(' | ')}`);
   return project;
 }
 
 export function status() {
-  return {mode:process.env.GEMINI_API_KEY ? 'gemini' : 'demo', model:process.env.GEMINI_API_KEY ? PRIMARY_MODEL : 'demo', github:!!process.env.GITHUB_TOKEN};
+  return {mode:process.env.GEMINI_API_KEY?'gemini':'demo',model:process.env.GEMINI_API_KEY?PRIMARY_MODEL:'demo',github:!!process.env.GITHUB_TOKEN};
 }
