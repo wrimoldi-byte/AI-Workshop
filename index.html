@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Workshop</title>
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 <div class="shell">
@@ -54,20 +54,21 @@
     <div id="projectNotes" class="notes"></div>
 
     <div class="githubbox">
-      <div class="githubhead"><div><h3>🐙 GitHub + Ejecutable</h3><p>Publica los archivos reales y, para Python/Streamlit, genera un .EXE con GitHub Actions.</p></div><span id="githubStatus" class="ghstatus">comprobando…</span></div>
+      <div class="githubhead"><div><h3>🐙 GitHub + APK / EXE</h3><p>Publica el proyecto y genera automáticamente un APK para Expo/React Native o un EXE para Python.</p></div><span id="githubStatus" class="ghstatus">comprobando…</span></div>
       <div id="githubSetup" class="ghsetup hidden">Falta configurar <b>GITHUB_TOKEN</b> como Secret de Vercel. No pegues tokens dentro del proyecto ni en este formulario.</div>
       <div class="ghfields"><div><label>Repositorio</label><input id="githubRepo" placeholder="wrimoldi-byte/Mi-Proyecto"></div><div><label>Rama</label><input id="githubBranch" value="main"></div></div>
-      <div class="ghactions"><button id="publishGithub" class="primary">↑ Publicar en GitHub</button><button id="buildExe" class="secondary" disabled>⚙ Compilar .EXE</button><button id="checkBuild" class="secondary">↻ Revisar build</button><a id="githubLink" class="actionlink hidden" target="_blank" rel="noopener">Abrir GitHub</a></div>
+      <div class="ghactions"><button id="publishGithub" class="primary">↑ Publicar en GitHub</button><button id="buildExe" class="secondary" disabled>⚙ Compilar instalable</button><button id="checkBuild" class="secondary">↻ Revisar build</button><a id="githubLink" class="actionlink hidden" target="_blank" rel="noopener">Abrir GitHub</a></div>
       <div id="githubMessage" class="ghmessage">Primero generá un proyecto y elegí el repositorio de destino.</div>
     </div>
   </section>
 </div>
-<script src="app.js?v=9"></script>
-<script src="zip.js?v=9"></script>
-<script src="autodev.js?v=9"></script>
-<script src="memory.js?v=9"></script>
-<script src="memory-migrate.js?v=9"></script>
-<script src="delivery-guard.js?v=9"></script>
-<script src="completion.js?v=9"></script>
-<script src="recovery.js?v=9"></script>
+<script src="app.js?v=10"></script>
+<script src="zip.js?v=10"></script>
+<script src="autodev.js?v=10"></script>
+<script src="memory.js?v=10"></script>
+<script src="memory-migrate.js?v=10"></script>
+<script src="delivery-guard.js?v=10"></script>
+<script src="completion.js?v=10"></script>
+<script src="recovery.js?v=10"></script>
+<script src="build-ui.js?v=10"></script>
 </body></html>
