@@ -28,7 +28,7 @@
       <button id="run" class="primary">▶ Iniciar deliberación</button>
       <button id="stop" class="secondary" disabled>■ Detener</button>
     </div>
-    <div id="devHint" class="hint hidden">En Desarrollo, los agentes cierran requisitos, diseñan arquitectura, revisan riesgos y un Builder genera archivos reales del MVP.</div>
+    <div id="devHint" class="hint hidden">En Desarrollo, los agentes cierran requisitos, diseñan arquitectura, revisan riesgos y un Builder genera archivos reales del MVP. Los mocks, TODOs y APIs simuladas bloquean la aprobación.</div>
   </section>
 
   <section class="grid">
@@ -46,6 +46,14 @@
     <div class="projectSummary"><strong id="projectName">—</strong><span id="projectSummary"></span><code id="projectRun"></code></div>
     <div class="fileworkspace"><div id="fileList" class="filelist"></div><div class="codewrap"><div id="filePath" class="filepath">Seleccioná un archivo</div><pre id="codeView"><code></code></pre></div></div>
     <div id="projectNotes" class="notes"></div>
+
+    <div class="githubbox">
+      <div class="githubhead"><div><h3>🐙 GitHub + Ejecutable</h3><p>Publica los archivos reales y, para Python/Streamlit, genera un .EXE con GitHub Actions.</p></div><span id="githubStatus" class="ghstatus">comprobando…</span></div>
+      <div id="githubSetup" class="ghsetup hidden">Falta configurar <b>GITHUB_TOKEN</b> como Secret de Vercel. No pegues tokens dentro del proyecto ni en este formulario.</div>
+      <div class="ghfields"><div><label>Repositorio</label><input id="githubRepo" placeholder="wrimoldi-byte/PicPerfect-ML"></div><div><label>Rama</label><input id="githubBranch" value="main"></div></div>
+      <div class="ghactions"><button id="publishGithub" class="primary">↑ Publicar en GitHub</button><button id="buildExe" class="secondary" disabled>⚙ Compilar .EXE</button><button id="checkBuild" class="secondary">↻ Revisar build</button><a id="githubLink" class="actionlink hidden" target="_blank" rel="noopener">Abrir GitHub</a></div>
+      <div id="githubMessage" class="ghmessage">Primero generá un proyecto y elegí el repositorio de destino.</div>
+    </div>
   </section>
 </div>
 <script src="app.js"></script>
