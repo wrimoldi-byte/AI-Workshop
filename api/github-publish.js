@@ -61,6 +61,19 @@ export default async function handler(req,res){
     const commit=await gh(`/repos/${repo}/git/commits`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:`AI Workshop: publish ${project.name||'generated project'}`,tree:newTree.sha,parents:[baseCommitSha]})});
     await gh(`/repos/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({sha:commit.sha,force:false})});
 
-    return res.status(200).json({ok:true,repo,branch,commit:commit.sha,url:`https://github.com/${repo}/commit/${commit.sha}`,repoUrl:`https://github.com/${repo}`,buildSupported:!!support.supported,exeName:support.exeName||null,buildReason:support.reason||null,fileCount:unique.size,privateRepo:!!meta.private});
+    return res.status(200).json({
+      ok:true,repo,branch,commit:commit.sha,
+      url:`https://github.com/${repo}/commit/${commit.sha}`,
+      repoUrl:`https://github.com/${repo}`,
+      buildSupported:!!support.supported,
+      buildKind:support.kind||null,
+      buildWorkflow:support.workflow||null,
+      artifactName:support.artifactName||null,
+      outputName:support.outputName||null,
+      exeName:support.exeName||null,
+      buildReason:support.reason||null,
+      fileCount:unique.size,
+      privateRepo:!!meta.private
+    });
   }catch(e){ return res.status(500).json({error:e.message}); }
 }
