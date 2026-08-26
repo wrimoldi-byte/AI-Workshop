@@ -1,0 +1,56 @@
+import {gh, buildSupportFiles} from './_github.js';
+
+function b64(s){ return Buffer.from(String(s),'utf8').toString('base64'); }
+function cleanRepo(v){
+  const s=String(v||'').trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,'').replace(/^\/+|\/+$/g,'');
+  if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(s)) throw new Error('Repo inválido. Usá owner/repo.');
+  return s;
+}
+async function getRef(repo, branch){
+  return gh(`/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+}
+
+export default async function handler(req,res){
+  if(req.method!=='POST') return res.status(405).json({error:'Method not allowed'});
+  try{
+    const body=req.body||{};
+    const repo=cleanRepo(body.repo);
+    const project=body.project;
+    if(!project || !Array.isArray(project.files) || !project.files.length) throw new Error('No hay proyecto generado para publicar.');
+    const meta=await gh(`/repos/${repo}`);
+    let branch=String(body.branch||meta.default_branch||'main');
+
+    let ref;
+    try { ref=await getRef(repo,branch); }
+    catch(e){
+      if(!/GitHub (404|409):/.test(e.message)) throw e;
+      await gh(`/repos/${repo}/contents/README.md`,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({message:'Initialize repository for AI Workshop',content:b64(`# ${project.name||'AI Workshop Project'}\n`)})});
+      const refreshed=await gh(`/repos/${repo}`); branch=refreshed.default_branch||branch;
+      ref=await getRef(repo,branch);
+    }
+
+    const baseCommitSha=ref.object.sha;
+    const baseCommit=await gh(`/repos/${repo}/git/commits/${baseCommitSha}`);
+    const support=body.buildExe===false ? {supported:false,files:[]} : buildSupportFiles(project);
+    const all=[...project.files,...(support.files||[])];
+    const unique=new Map();
+    for(const f of all){
+      const path=String(f.path||'').replace(/^\/+/, '');
+      if(!path || path.includes('..')) throw new Error(`Ruta inválida: ${path}`);
+      unique.set(path,String(f.content||''));
+    }
+    let bytes=0; for(const v of unique.values()) bytes+=Buffer.byteLength(v,'utf8');
+    if(bytes>1800000) throw new Error('El proyecto supera el límite de publicación directa (1.8 MB de texto).');
+
+    const tree=[];
+    for(const [path,content] of unique){
+      const blob=await gh(`/repos/${repo}/git/blobs`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({content,encoding:'utf-8'})});
+      tree.push({path,mode:'100644',type:'blob',sha:blob.sha});
+    }
+    const newTree=await gh(`/repos/${repo}/git/trees`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({base_tree:baseCommit.tree.sha,tree})});
+    const commit=await gh(`/repos/${repo}/git/commits`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({message:`AI Workshop: publish ${project.name||'generated project'}`,tree:newTree.sha,parents:[baseCommitSha]})});
+    await gh(`/repos/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({sha:commit.sha,force:false})});
+
+    return res.status(200).json({ok:true,repo,branch,commit:commit.sha,url:`https://github.com/${repo}/commit/${commit.sha}`,buildSupported:!!support.supported,exeName:support.exeName||null,buildReason:support.reason||null,fileCount:unique.size});
+  }catch(e){ return res.status(500).json({error:e.message}); }
+}
