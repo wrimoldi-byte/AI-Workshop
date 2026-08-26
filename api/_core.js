@@ -8,20 +8,36 @@ function parseGeminiText(data) {
 async function askGemini(instructions, input) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 22000);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`;
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
-    body: JSON.stringify({
-      systemInstruction: {parts: [{text: instructions}]},
-      contents: [{role: 'user', parts: [{text: input}]}]
-    })
-  });
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${await r.text()}`);
-  const data = await r.json();
-  const text = parseGeminiText(data);
-  if (!text) throw new Error('Gemini respondió sin texto utilizable.');
-  return text;
+
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {'x-goog-api-key': key, 'content-type': 'application/json'},
+      body: JSON.stringify({
+        systemInstruction: {parts: [{text: instructions}]},
+        contents: [{role: 'user', parts: [{text: input}]}],
+        generationConfig: {
+          thinkingConfig: {thinkingLevel: 'low'},
+          maxOutputTokens: 1400
+        }
+      })
+    });
+    if (!r.ok) throw new Error(`Gemini ${r.status}: ${await r.text()}`);
+    const data = await r.json();
+    const text = parseGeminiText(data);
+    if (!text) throw new Error('Gemini respondió sin texto utilizable.');
+    return text;
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('Gemini tardó demasiado en responder (22 s). Probá nuevamente.');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function demoAgent(role, goal, current, rules, round) {
