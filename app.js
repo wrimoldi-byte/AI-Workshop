@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s);
 const log=$('#log');
-let stopped=false,best='',history=[],workMode='ideas',currentProject=null,selectedFile=0;
+let stopped=false,best='',history=[],workMode='dev',currentProject=null,selectedFile=0;
 let githubInfo={configured:false,ok:false},lastPublish=null,buildPollTimer=null;
 
 const AGENTS={
