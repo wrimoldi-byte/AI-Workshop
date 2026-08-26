@@ -3,7 +3,23 @@ async function status(){const s=await fetch('/api/status').then(r=>r.json()); $(
 function setAgent(name,state){document.querySelectorAll('.agent').forEach(a=>a.classList.remove('active')); const a=document.querySelector(`[data-agent="${name}"]`); if(a){a.classList.add(state==='active'?'active':'done');}}
 function addMsg(role,text){if(log.querySelector('.empty')) log.innerHTML=''; const d=document.createElement('div');d.className=`msg ${role}`;d.innerHTML=`<b>${role}</b>${escapeHtml(text)}`;log.appendChild(d);log.scrollTop=log.scrollHeight;history.push({role,text});}
 function escapeHtml(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-async function agent(role,goal,current,rules,round){setAgent(role,'active'); const r=await fetch('/api/agent',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({role,goal,current,rules,round,history})}); const j=await r.json(); if(!r.ok) throw new Error(j.error||'Error'); addMsg(role,j.text); setAgent(role,'done'); return j.text;}
+async function agent(role,goal,current,rules,round){
+  setAgent(role,'active');
+  const pending=document.createElement('div');pending.className='msg Sistema';pending.dataset.pending='1';pending.innerHTML=`<b>Sistema</b>${role} está pensando…`;
+  if(log.querySelector('.empty')) log.innerHTML=''; log.appendChild(pending); log.scrollTop=log.scrollHeight;
+  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),30000);
+  try{
+    const r=await fetch('/api/agent',{method:'POST',signal:controller.signal,headers:{'content-type':'application/json'},body:JSON.stringify({role,goal,current,rules,round,history})});
+    const j=await r.json().catch(()=>({error:'Respuesta inválida del servidor'}));
+    pending.remove();
+    if(!r.ok) throw new Error(j.error||'Error');
+    addMsg(role,j.text); setAgent(role,'done'); return j.text;
+  }catch(e){
+    pending.remove();
+    if(e?.name==='AbortError') throw new Error(`${role} tardó demasiado en responder. Intentá nuevamente.`);
+    throw e;
+  }finally{clearTimeout(timer)}
+}
 function parseEval(text){try{return JSON.parse(text.match(/\{[\s\S]*\}/)?.[0]||text)}catch{return {score:0,verdict:'ITERAR',reason:'No se pudo leer la evaluación'}}}
 $('#run').onclick=async()=>{const goal=$('#goal').value.trim();if(!goal)return alert('Escribí o dictá un objetivo.');stopped=false;history=[];best='';log.innerHTML='';$('#run').disabled=true;$('#stop').disabled=false;document.querySelectorAll('.agent').forEach(a=>a.className='agent');let current='';const max=Math.min(10,Math.max(1,+$('#rounds').value||5));const target=+$('#target').value||9;try{for(let round=1;round<=max&&!stopped;round++){ $('#roundLabel').textContent=`Ronda ${round} / ${max}`; const rules=$('#rules').value.trim(); current=await agent('Creador',goal,current,rules,round); const critique=await agent('Crítico',goal,current,rules,round); const improvements=await agent('Especialista',goal,current+'\n\nCRÍTICA:\n'+critique,rules,round); current=await agent('Creador',goal,current+'\n\nMEJORAS A INTEGRAR:\n'+improvements,rules,round); const ev=parseEval(await agent('Evaluador',goal,current,rules,round)); const score=Math.max(0,Math.min(10,+ev.score||0)); $('#score').textContent=score.toFixed(1);$('#bar').style.width=`${score*10}%`;$('#verdict').textContent=`${ev.verdict}: ${ev.reason||''}`;best=current;$('#result').textContent=best;if(score>=target||ev.verdict==='APROBAR'){addMsg('Director',`Objetivo de calidad alcanzado (${score.toFixed(1)}/10). Se detiene la deliberación.`);break;}}}catch(e){addMsg('Sistema','Error: '+e.message)}finally{$('#run').disabled=false;$('#stop').disabled=true;$('#roundLabel').textContent=stopped?'Detenido':'Finalizado';}};
 $('#stop').onclick=()=>{stopped=true;$('#stop').disabled=true};$('#clear').onclick=()=>{log.innerHTML='<div class="empty">La deliberación aparecerá acá en tiempo real.</div>';history=[]};$('#copy').onclick=()=>navigator.clipboard.writeText($('#result').textContent);
