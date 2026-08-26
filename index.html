@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Workshop</title>
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 <div class="shell">
@@ -31,6 +31,12 @@
     <div id="devHint" class="hint hidden">En Desarrollo, los agentes cierran requisitos, diseñan arquitectura, revisan riesgos y un Builder genera archivos reales del MVP. Los mocks, TODOs y APIs simuladas bloquean la aprobación.</div>
   </section>
 
+  <section id="memoryPanel" class="panel memory">
+    <div class="sectiontitle memorytitle"><div><h2>📚 Memoria de proyectos</h2><small>Retomá una idea o versión anterior sin empezar de cero.</small></div><span id="memoryCount">0 guardados</span></div>
+    <div class="memorytools"><input id="memorySearch" placeholder="Buscar ideas o proyectos…"><button id="memoryClear" class="linkbtn">Borrar memoria</button></div>
+    <div id="memoryList" class="memorylist"><div class="memoryempty">Todavía no hay ideas o proyectos guardados en este dispositivo.</div></div>
+  </section>
+
   <section class="grid">
     <div class="panel agents"><div class="sectiontitle"><h2>Agentes</h2><span id="roundLabel">Sin iniciar</span></div>
       <div id="agentList"></div>
@@ -56,7 +62,8 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=4"></script>
-<script src="zip.js?v=4"></script>
-<script src="autodev.js?v=4"></script>
+<script src="app.js?v=5"></script>
+<script src="zip.js?v=5"></script>
+<script src="autodev.js?v=5"></script>
+<script src="memory.js?v=5"></script>
 </body></html>
