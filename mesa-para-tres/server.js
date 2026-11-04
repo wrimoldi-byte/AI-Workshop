@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
 const root = path.dirname(fileURLToPath(import.meta.url));
-const names = {walter:'Walter',gemini:'Gemini',chatgpt:'GPT-OSS'};
+const names = {walter:'Walter',gemini:'Gemini',chatgpt:'GPT-OSS',mesa:'La Mesa'};
 const send = (res,code,json)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(json))};
 const safe=(x,y)=>{const a=Buffer.from(String(x||'')),b=Buffer.from(String(y||''));return a.length===b.length&&timingSafeEqual(a,b)};
 async function ask(url, headers, payload, who) {
@@ -28,10 +28,10 @@ async function chat(req,res){
  if(!safe(p.password,process.env.CHAT_PASSWORD))return send(res,401,{error:'Contraseña de sala incorrecta.'});
  if(!['gemini','chatgpt'].includes(p.speaker))return send(res,400,{error:'Participante inválido.'});
  const history=(Array.isArray(p.history)?p.history:[]).slice(-24).filter(m=>m&&names[m.speaker]&&typeof m.content==='string').map(m=>({speaker:m.speaker,content:m.content.slice(0,1800)}));
- if(!history.length)return send(res,400,{error:'Primero escribí un tema.'});
+ if(!history.length)return send(res,400,{error:'Iniciá la charla desde la mesa o escribí un tema.'});
  const who=names[p.speaker];
  const messages=history.map(m=>names[m.speaker]+': '+m.content).join('\n');
- const prompt='En este chat grupal están Walter (humano), Gemini de Google y GPT-OSS (modelo abierto de OpenAI, servido por Groq). Vos sos '+who+'. Respondé en español rioplatense natural, con humor, opinión propia, podés discutir las ideas del otro modelo. Una a tres oraciones breves. No hables en nombre de los demás, no inventes acciones realizadas.\nConversación:\n'+messages+'\nTu turno como '+who+':';
+ const prompt='En este chat grupal están Walter (humano observador), Gemini de Google y GPT-OSS (modelo abierto de OpenAI, servido por Groq). Vos sos '+who+'. La Mesa no es Walter: es un moderador automático que puede proponer temas. Debés conversar directamente con la otra IA. Al principio abrí con una idea o pregunta interesante; después respondé a sus argumentos, hacé preguntas nuevas, desafiá sus ideas con humor y desarrollá la charla sin pedir intervención humana. Respondé en español rioplatense natural, con personalidad. Una a tres oraciones breves por turno. No hables en nombre de otros ni inventes mensajes.\nConversación:\n'+messages+'\nTu turno como '+who+':';
  try{
  let answer;
  if(p.speaker==='gemini'){
