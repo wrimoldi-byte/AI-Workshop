@@ -14,10 +14,8 @@ async function ask(url, headers, payload, who) {
   const data=await r.json().catch(()=>({}));
   if(!r.ok){
    const e=data.error?.message||'';
-   if(r.status===429)throw Error(who+': límite gratuito alcanzado (429).');
-   if(r.status===401||r.status===403)throw Error(who+': clave inválida o sin permisos ('+r.status+').');
-   if(r.status===404)throw Error(who+': modelo no disponible (404).');
-   throw Error(who+': error '+r.status+(e?' — '+String(e).slice(0,100):''));
+   const description=r.status===429?'cuota o límite de solicitudes (429)':(r.status===503?'servicio temporalmente sobrecargado (503)':((r.status===401||r.status===403)?'clave inválida o sin permisos ('+r.status+')':(r.status===404?'modelo no disponible (404)':'error '+r.status)));
+   throw Object.assign(new Error(who+': '+description+(e?' — '+String(e).slice(0,85):'')),{status:r.status});
   }
   return data;
  } finally {clearTimeout(timeout)}
@@ -40,13 +38,27 @@ async function chat(req,res){
   if(!process.env.GEMINI_API_KEY)return send(res,503,{error:'Falta GEMINI_API_KEY en Render. Obtenela en Google AI Studio.'});
   const geminiPayload={contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1200,thinkingConfig:{thinkingLevel:'low'}}};
   const geminiHeaders={'x-goog-api-key':process.env.GEMINI_API_KEY};
-  let data;
-  try { data=await ask('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(process.env.GEMINI_MODEL||'gemini-3.8-flash')+':generateContent',geminiHeaders,geminiPayload,who); }
-  catch(e){
-   if(!e.message.includes('(404)'))throw e;
-   data=await ask('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',geminiHeaders,geminiPayload,who);
+  const candidates=[process.env.GEMINI_MODEL||'gemini-3.5-flash-lite','gemini-3.8-flash','gemini-3.6-flash'].filter((v,i,a)=>v && a.indexOf(v)===i);
+  let lastError;
+  for(const model of candidates){
+   for(let retry=0;retry<2;retry++){
+    try{
+     const data=await ask('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent',geminiHeaders,geminiPayload,who);
+     answer=(data.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
+     if(!answer?.trim())throw new Error('Gemini respondió sin texto utilizable.');
+     if(model!==candidates[0])console.info('Gemini funcionó con modelo alternativo:',model);
+     break;
+    }catch(e){
+     lastError=e;
+     if(![404,429,500,502,503,504].includes(e.status))throw e;
+     console.warn('Gemini no disponible:',model,'HTTP',e.status,'reintento',retry);
+     if(e.status===503 && retry===0){await new Promise(resolve=>setTimeout(resolve,750));continue}
+     break;
+    }
+   }
+   if(answer?.trim())break;
   }
-  answer=(data.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
+  if(!answer?.trim())throw new Error('Gemini no respondió con ningún modelo disponible. '+(lastError?.status===503?'Google informó alta demanda; probá de nuevo más tarde.':lastError?.status===429?'Se alcanzó un límite de solicitudes de Google.':String(lastError?.message||'')));
  } else {
   if(!process.env.GROQ_API_KEY)return send(res,503,{error:'Falta GROQ_API_KEY en Render. Obtenela en Groq Console.'});
   const data=await ask('https://api.groq.com/openai/v1/chat/completions',{Authorization:'Bearer '+process.env.GROQ_API_KEY},{model:process.env.GROQ_MODEL||'openai/gpt-oss-120b',messages:[{role:'user',content:prompt}],max_completion_tokens:1000},who);
