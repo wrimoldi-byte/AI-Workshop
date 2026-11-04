@@ -38,7 +38,14 @@ async function chat(req,res){
  let answer;
  if(p.speaker==='gemini'){
   if(!process.env.GEMINI_API_KEY)return send(res,503,{error:'Falta GEMINI_API_KEY en Render. Obtenela en Google AI Studio.'});
-  const data=await ask('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(process.env.GEMINI_MODEL||'gemini-2.5-flash')+':generateContent',{'x-goog-api-key':process.env.GEMINI_API_KEY},{contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:600}},who);
+  const geminiPayload={contents:[{parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1200,thinkingConfig:{thinkingLevel:'low'}}};
+  const geminiHeaders={'x-goog-api-key':process.env.GEMINI_API_KEY};
+  let data;
+  try { data=await ask('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(process.env.GEMINI_MODEL||'gemini-3.8-flash')+':generateContent',geminiHeaders,geminiPayload,who); }
+  catch(e){
+   if(!e.message.includes('(404)'))throw e;
+   data=await ask('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',geminiHeaders,geminiPayload,who);
+  }
   answer=(data.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
  } else {
   if(!process.env.GROQ_API_KEY)return send(res,503,{error:'Falta GROQ_API_KEY en Render. Obtenela en Groq Console.'});
